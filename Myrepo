@@ -1,20 +1,44 @@
-Ah perfect — thanks for clarifying 🙏
+Yes 👍 the LLM can do the mapping itself even if you don’t have pre-written rules — that’s actually one of the main reasons to bring RAG into the workflow.
 
-So you’re saying:
-
-Step 1: Regardless of operator (Telus, Vodafone, etc.), you normalize to Samsung Standard CIQ. That’s already solved.
-
-Step 2: From this standard, you must generate NE Grow template.
-
-Problems:
-
-1. Different NE templates exist (per operator, vendor release, technology – LTE/NR/NSA/SA).
+But there are a few nuances 👇
 
 
-2. LLM context length is limited → can’t always load full CIQ + full NE template in one go.
+---
+
+🔑 How LLM Can Map Without Rules
+
+1. Input to LLM:
+
+Samsung Standard CIQ column headers (and optionally some sample rows).
+
+NE Grow template headers.
+
+Prompt: “Map NE Grow fields to Standard CIQ fields or derive them.”
 
 
-3. Which NE template to select? depends on operator, RAT, region, or project type.
+
+2. LLM Reasoning:
+
+It uses semantic similarity + naming conventions.
+
+CELL_ID ↔ CellId
+
+TAC ↔ TrackingAreaCode
+
+ENBID ↔ combination of MCC, MNC, ENodeB_ID
+
+
+If it can’t match → it will either guess or leave blank.
+
+
+
+3. RAG Enhancement (Why RAG is Better):
+
+If you only rely on LLM, each query is “stateless.”
+
+With RAG, you feed it examples from past confirmed mappings.
+
+This anchors the LLM to real mappings (per operator), reducing hallucinations.
 
 
 
@@ -22,17 +46,95 @@ Problems:
 
 ---
 
-🔑 Solution Strategy
+🛠️ Options for You
 
-1. Template Repository (Knowledge Base)
+Option A — Pure LLM (No Rules, No RAG)
 
-Instead of relying only on LLM context:
+Pros: Fast to set up, no prep work.
 
-Maintain a repository of NE Grow templates (Telus LTE, Vodafone 5G, etc.) in structured form.
+Cons: Inconsistent, may hallucinate field mappings differently each time.
 
-Each template has:
 
-Columns/fields required
+Option B — LLM + RAG (Recommended)
+
+Build a small KB of:
+
+NE Grow template field descriptions
+
+Operator-specific examples (even if only Telus for now)
+
+
+Use vector search → retrieve “hints” for each mapping.
+
+Ask LLM to reason using retrieved examples + CIQ data.
+
+Output is more stable and explainable.
+
+
+
+---
+
+🔄 Suggested Workflow if You Start With No Rules
+
+1. Load Samsung Standard CIQ + NE Grow template headers.
+
+
+2. For each NE Grow field:
+
+Ask LLM:
+
+Given these Samsung Standard CIQ columns:
+[CellId, TrackingAreaCode, MCC, MNC, ENodeB_ID, ...]
+
+Map to NE Grow column "CELL_ID".
+If direct → say "CELL_ID ← CellId".
+If derived → explain derivation.
+If not found → say "Not Found".
+
+
+
+3. Collect mappings into a JSON.
+
+
+4. Apply transformations with pandas.
+
+
+5. Save generated NE Grow Excel.
+
+
+6. Ask user to validate.
+
+
+7. Save confirmed mappings as rules → build KB → enable RAG.
+
+
+
+
+---
+
+⚡ Practical Tip
+
+If you have only Telus NE Grow template today, you can bootstrap by asking the LLM to infer the Telus rules directly from CIQ+Template.
+
+That gives you your first KB entry.
+
+Later when Vodafone NE Grow comes, repeat the process.
+
+
+
+---
+
+✅ So, short answer: Yes, LLM can directly map CIQ → NE Grow without rules, but:
+
+It’s safer with RAG (to avoid random outputs).
+
+Even without rules, you should still capture the LLM’s output into your KB so you don’t ask it again every time.
+
+
+
+---
+
+Would you like me to draft a real Guess API prompt that you can use today to get mappings directly from the LLM when no rules exist?
 
 Mapping rules from Samsung Standard CIQ
 
