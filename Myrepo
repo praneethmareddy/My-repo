@@ -1,0 +1,155 @@
+Ah perfect — thanks for clarifying 🙏
+
+So you’re saying:
+
+Step 1: Regardless of operator (Telus, Vodafone, etc.), you normalize to Samsung Standard CIQ. That’s already solved.
+
+Step 2: From this standard, you must generate NE Grow template.
+
+Problems:
+
+1. Different NE templates exist (per operator, vendor release, technology – LTE/NR/NSA/SA).
+
+
+2. LLM context length is limited → can’t always load full CIQ + full NE template in one go.
+
+
+3. Which NE template to select? depends on operator, RAT, region, or project type.
+
+
+
+
+
+---
+
+🔑 Solution Strategy
+
+1. Template Repository (Knowledge Base)
+
+Instead of relying only on LLM context:
+
+Maintain a repository of NE Grow templates (Telus LTE, Vodafone 5G, etc.) in structured form.
+
+Each template has:
+
+Columns/fields required
+
+Mapping rules from Samsung Standard CIQ
+
+Any operator-specific derivations.
+
+
+
+Store this in a vector DB (FAISS/Chroma) with metadata:
+
+{
+  "operator": "Vodafone",
+  "tech": "5G",
+  "template": "vodafone_ne_grow_v3.xlsx",
+  "mapping_rules": [
+    {"NE_GROW": "CELL_ID", "CIQ": "CellId"},
+    {"NE_GROW": "TAC", "CIQ": "TrackingAreaCode"},
+    {"NE_GROW": "ENBID", "CIQ": "ENodeB_ID"}
+  ]
+}
+
+
+---
+
+2. Template Selection
+
+When processing a CIQ:
+
+Parse operator, RAT, and project type from CIQ metadata (already available in Samsung Standard CIQ header).
+
+Query vector DB → retrieve most relevant NE Grow template.
+
+e.g., Telus + NR → select telus_nr_ne_grow_v2.
+
+
+If multiple candidates found → ask user:
+“I found 2 NE Grow templates for Vodafone NR. Which one should I use: v2 (2023) or v3 (2024)?”
+
+
+
+---
+
+3. Chunked RAG for LLM Context
+
+Instead of giving full CIQ (thousands of rows):
+
+Split Samsung Standard CIQ into per-site or per-sector chunks.
+
+Process one chunk at a time into NE Grow format.
+
+Append results into final NE Grow Excel.
+
+
+This way, LLM context length won’t explode.
+
+
+---
+
+4. Pipeline Flow
+
+1. Upload Samsung Standard CIQ.
+
+
+2. Extract operator + RAT.
+
+
+3. RAG → select correct NE Grow template + mapping rules.
+
+
+4. For each site/sector (chunk):
+
+Apply mapping rules.
+
+Use LLM only if transformation is non-deterministic (e.g., deriving values).
+
+
+
+5. Append rows → build final NE Grow.
+
+
+6. Show summary:
+
+✅ Filled columns
+
+⚠️ Unmapped/missing columns (ask user to confirm).
+
+
+
+
+
+---
+
+5. Fallback Logic
+
+Direct mapping (deterministic): Done by code (pandas).
+
+Ambiguous/derived mapping: Retrieved via RAG → ask LLM to assist.
+
+Template selection issue: Ask user.
+
+
+
+---
+
+👉 This hybrid approach reduces LLM load and ensures reliability across multiple operators.
+You basically use LLM as a “reasoning assistant” only when simple pandas mapping isn’t enough.
+
+
+---
+
+Do you want me to draw an architecture diagram + sample code snippet (Python + FAISS + pandas) showing how:
+
+CIQ → detect operator/RAT
+
+Pick NE Grow template
+
+Map chunk by chunk → Excel
+
+
+? That way you’ll see the full end-to-end picture.
+
